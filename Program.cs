@@ -9,12 +9,13 @@ namespace epic_luncher
         /// <summary>
         /// Point d'entrée principal de l'application.
         /// </summary>
+        static Form appli;
         [STAThread]
         static void Main()
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new Form1());
+            Application.Run(appli = new Form1());
         }
     }
 }
