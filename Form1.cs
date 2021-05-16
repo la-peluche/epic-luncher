@@ -576,19 +576,25 @@ namespace luncher_epic_de_serveur
         public static DataTable dataTable = new DataTable();
         public static string help(JoueurConnecte index) 
         {
-            System.Reflection.MethodInfo[] order = typeof(Commandes).GetMethods();
-            string mytext = "";
-            for (int i = 0; i < order.Length - 4; i++)
+            object[] tabs = typeof(Commandes).GetMethods();
+            Array.Resize(ref tabs, tabs.Length - 4);
+            for (int i=0; i<tabs.Length;i++)
             {
-                mytext = mytext + "\\n!" + order[i].ToString().Split(' ')[1].Split('(')[0];
+                tabs[i] = tabs[i].ToString().Split(' ')[1].Split('(')[0];
             }
-            return "tellraw " + index.name + " \"Les commandes supplementaire sont:"+ mytext + "\"";
+            Array.Sort(tabs);
+            string mytext = "";
+            for (int i = 0; i < tabs.Length; i++)
+            {
+                mytext = mytext + "\\n!" + tabs[i];
+            }
+            return "tellraw " + index.name + " \"Les commandes supplementaires sont:"+ mytext + "\"";
         }
         public static string amop(JoueurConnecte index)
         {
             if (index.op)
             {
-                return "tellraw " + index.name + " \"tu es un operateur du serveur\"";
+                return "tellraw " + index.name + " \"tu es un operateur du serveur\n soit prudent\"";
             }
             else
             {
@@ -599,9 +605,16 @@ namespace luncher_epic_de_serveur
         { 
             if (index.op && (DateTime.TryParse(commandes, out DateTime settime) || string.IsNullOrEmpty(commandes)) && DateTime.Compare(DateTime.Now , settime)<0 )
             {
-                TimeSpan attente = settime.AddSeconds(-10) - DateTime.Now;
-                Programme.serv_ecriture("tellraw @a \"le serveur va redemarrer le " + settime.Date.ToLongDateString() + " a " + TimeSpan.FromSeconds((int)settime.TimeOfDay.TotalSeconds).ToString() + " a la demande de " + index.name + "\"");
-                Thread.Sleep(attente);
+                if (string.IsNullOrEmpty(commandes))
+                {
+                    Programme.serv_ecriture("tellraw @a \"le serveur va redemarrer a la demande de " + index.name + "\"");
+                }
+                else
+                {
+                    TimeSpan attente = settime.AddSeconds(-10) - DateTime.Now;
+                    Programme.serv_ecriture("tellraw @a \"le serveur va redemarrer le " + settime.Date.ToLongDateString() + " a " + TimeSpan.FromSeconds((int)settime.TimeOfDay.TotalSeconds).ToString() + " a la demande de " + index.name + "\"");
+                    Thread.Sleep(attente);
+                }
                 Programme.reboot();
             }
             else if (index.op)
@@ -679,22 +692,33 @@ namespace luncher_epic_de_serveur
         public static string link(JoueurConnecte index, string commande) // a refaire si possible
         {
             string[] commandepart = commande.Split( new char[]  {' '}, StringSplitOptions.RemoveEmptyEntries) ;
-            if (!commandepart[commandepart.Length-1].StartsWith("http")) { commandepart[commandepart.Length - 1] = "http://" + commandepart[commandepart.Length - 1]; }
-            if (commandepart.Length == 2)
-            {
-                return "tellraw @a  {\"text\":\"" + commandepart[0] + "\",\"underlined\":true,\"clickEvent\":{ \"action\":\"open_url\",\"value\":\"" + commandepart[1]+"\"}}";
+            int longueur = commandepart.Length;
+            if (!commandepart[longueur - 1].StartsWith("http")) { commandepart[commandepart.Length - 1] = "http://" + commandepart[commandepart.Length - 1]; }
+            if (longueur < 2) { return "tellraw " + index.name + " \"!link [texte] color=[couleur(en_anglais,optionnal)] [lien]\""; }
+            if (commandepart[longueur - 2].StartsWith("color=")) 
+            { 
+                longueur = longueur - 2;
+                commandepart[longueur] = commandepart[longueur].Remove(0, 6);
+            } 
+            else 
+            { 
+                longueur = longueur - 1;
+                Array.Resize(ref commandepart, longueur + 2);
+                commandepart[longueur + 1] = commandepart[longueur];
+                commandepart[longueur] = "white";
             }
-            else if (commandepart.Length == 3)
+            for (int i=1;i<longueur;i++)
             {
-                return "tellraw @a {\"text\":\""+ commandepart[0] + "\",\"underlined\":true,\"color\":\""+ commandepart[1] + "\",\"clickEvent\":{ \"action\":\"open_url\",\"value\":\""+ commandepart[2] + "\"}}";
+                commandepart[0] = commandepart[0] + " " + commandepart[i];
             }
-            return "tellraw "+index.name+" \"!link [texte] [couleur(en_anglais,optionnal)] [lien]\"";
+            return "tellraw @a {\"text\":\""+ commandepart[0] + "\",\"underlined\":true,\"color\":\""+ commandepart[longueur] + "\",\"clickEvent\":{ \"action\":\"open_url\",\"value\":\""+ commandepart[longueur + 1] + "\"}}";
         }
-        public static string nowtime(JoueurConnecte index)
+        public static string currenttime(JoueurConnecte index)
         {
-            return "tellraw " + index.name + " \"" + TimeSpan.FromSeconds((int)DateTime.Now.TimeOfDay.TotalSeconds).ToString()+"\"";
+            Programme.serv_ecriture("tellraw @a \"diffuse par " + index.name + "\"");
+            return "title @a title \"" + TimeSpan.FromSeconds((int)DateTime.Now.TimeOfDay.TotalMinutes).ToString()+"\"";
         }
-        public static string gametime(JoueurConnecte index)
+        public static string playtime(JoueurConnecte index)
         {
             var joueurs = Form1.joueursConnectes;
             string txt = "";
@@ -710,11 +734,11 @@ namespace luncher_epic_de_serveur
             string[] tab_args = arguments.Split(new char[] { ' ' }, 2, StringSplitOptions.None);
             if (DateTime.TryParse(tab_args[0], out DateTime time2alarm))
             {
-                if( DateTime.Compare(DateTime.Now, time2alarm) < 0) 
+                if( DateTime.Compare(DateTime.Now.AddMinutes(1), time2alarm) < 0) 
                 {
                     time2alarm.AddDays(1);
                 }
-                if (DateTime.Compare(DateTime.Now, time2alarm) < 0)
+                if (DateTime.Compare(DateTime.Now.AddMinutes(1), time2alarm) < 0)
                 {
                     Programme.serv_ecriture("tellraw " + index.name + " \"le rappel est enregiste pour le "+time2alarm.Date.ToLongDateString()+" a " + TimeSpan.FromSeconds((int) time2alarm.TimeOfDay.TotalSeconds).ToString() + "\"");
                     Thread.Sleep(time2alarm - DateTime.Now);
